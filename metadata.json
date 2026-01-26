@@ -1,0 +1,7 @@
+{
+  "name": "phase0 - Operating System for Informal Events",
+  "description": "Building infrastructure for high-trust, high-noise real-world events. Focused on door operations, identity, and reliability.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
