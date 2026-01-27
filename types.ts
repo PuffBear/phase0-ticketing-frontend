@@ -76,11 +76,3 @@ export interface User {
   username: string;
   role: UserRole;
 }
-
-// Added CheckInLog interface to resolve the import error in geminiService.ts
-export interface CheckInLog {
-  id: string;
-  ticket_id: string;
-  timestamp: string;
-  successful: boolean;
-}

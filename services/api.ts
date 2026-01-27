@@ -1,4 +1,4 @@
-export const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3001';
+export const API_BASE = import.meta.env.VITE_API_BASE || 'http://54.91.10.203';
 
 const parseJSON = async <T,>(response: Response): Promise<T> => {
   const data = await response.json().catch(() => ({}));
