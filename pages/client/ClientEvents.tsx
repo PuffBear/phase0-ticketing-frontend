@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { apiDelete, apiGet, apiPost } from '../../services/api';
-import { ClientLayout } from './ClientLayout';
-import { UserRole } from '../../types';
+import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { apiDelete, apiGet, apiPost } from "../../services/api";
+import { ClientLayout } from "./ClientLayout";
+import { UserRole } from "../../types";
 
 interface EventItem {
   id: string;
@@ -22,19 +22,22 @@ export const ClientEvents: React.FC<ClientEventsProps> = ({ role }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [location, setLocation] = useState('');
-  const [startAt, setStartAt] = useState('');
-  const [capacity, setCapacity] = useState('');
-  const [staffEntries, setStaffEntries] = useState([{ email: '', password: '' }]);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [location, setLocation] = useState("");
+  const [startAt, setStartAt] = useState("");
+  const [capacity, setCapacity] = useState("");
+  const [price, setPrice] = useState("");
+  const [staffEntries, setStaffEntries] = useState([
+    { email: "", password: "" },
+  ]);
 
   const loadEvents = async () => {
     try {
-      const result = await apiGet<{ events: EventItem[] }>('/client/events');
+      const result = await apiGet<{ events: EventItem[] }>("/client/events");
       setEvents(result.events || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load events.');
+      setError(err instanceof Error ? err.message : "Failed to load events.");
     } finally {
       setLoading(false);
     }
@@ -48,36 +51,40 @@ export const ClientEvents: React.FC<ClientEventsProps> = ({ role }) => {
     event.preventDefault();
     setError(null);
     try {
-      await apiPost('/client/events', {
+      await apiPost("/client/events", {
         title,
         description,
         location,
         startAt,
         capacity: Number(capacity),
-        reentryPolicy: 'count_only',
-        staff: staffEntries.filter(entry => entry.email.trim())
+        price: Number(price) || 0,
+        reentryPolicy: "count_only",
+        staff: staffEntries.filter((entry) => entry.email.trim()),
       });
-      setTitle('');
-      setDescription('');
-      setLocation('');
-      setStartAt('');
-      setCapacity('');
-      setStaffEntries([{ email: '', password: '' }]);
+      setTitle("");
+      setDescription("");
+      setLocation("");
+      setStartAt("");
+      setCapacity("");
+      setPrice("");
+      setStaffEntries([{ email: "", password: "" }]);
       await loadEvents();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create event.');
+      setError(err instanceof Error ? err.message : "Failed to create event.");
     }
   };
 
   const handleDelete = async (eventId: string) => {
-    const confirmed = window.confirm('Delete this event? This cannot be undone.');
+    const confirmed = window.confirm(
+      "Delete this event? This cannot be undone.",
+    );
     if (!confirmed) return;
     setError(null);
     try {
       await apiDelete(`/client/events/${eventId}`);
       await loadEvents();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete event.');
+      setError(err instanceof Error ? err.message : "Failed to delete event.");
     }
   };
 
@@ -87,9 +94,13 @@ export const ClientEvents: React.FC<ClientEventsProps> = ({ role }) => {
     <ClientLayout title="Events" active="events">
       <div className="space-y-8">
         <section className="space-y-3">
-          <h2 className="text-xl font-black uppercase tracking-widest">Assigned Events</h2>
+          <h2 className="text-xl font-black uppercase tracking-widest">
+            Assigned Events
+          </h2>
           {loading ? (
-            <p className="text-xs text-zinc-500 uppercase tracking-widest">Loading...</p>
+            <p className="text-xs text-zinc-500 uppercase tracking-widest">
+              Loading...
+            </p>
           ) : events.length === 0 ? (
             <div className="border border-dashed border-[#27272a] rounded-2xl p-6 text-center text-zinc-500 text-xs font-bold uppercase tracking-widest">
               No events assigned yet.
@@ -97,14 +108,25 @@ export const ClientEvents: React.FC<ClientEventsProps> = ({ role }) => {
           ) : (
             <div className="grid gap-4">
               {events.map((event) => (
-                <div key={event.id} className="border border-[#27272a] rounded-2xl p-6 bg-[#111114] flex items-center justify-between">
+                <div
+                  key={event.id}
+                  className="border border-[#27272a] rounded-2xl p-6 bg-[#111114] flex items-center justify-between"
+                >
                   <div>
-                    <h3 className="text-lg font-black uppercase tracking-wider">{event.title}</h3>
-                    <p className="text-xs text-zinc-500 font-bold uppercase tracking-widest">{event.location}</p>
-                    <p className="text-[10px] text-zinc-600 uppercase tracking-widest">{new Date(event.startAt).toLocaleString()}</p>
+                    <h3 className="text-lg font-black uppercase tracking-wider">
+                      {event.title}
+                    </h3>
+                    <p className="text-xs text-zinc-500 font-bold uppercase tracking-widest">
+                      {event.location}
+                    </p>
+                    <p className="text-[10px] text-zinc-600 uppercase tracking-widest">
+                      {new Date(event.startAt).toLocaleString()}
+                    </p>
                   </div>
                   <div className="flex items-center gap-4">
-                    <span className="text-[10px] text-blue-400 uppercase tracking-widest">Capacity {event.capacity}</span>
+                    <span className="text-[10px] text-blue-400 uppercase tracking-widest">
+                      Capacity {event.capacity}
+                    </span>
                     <Link
                       to={`/client/events/${event.id}`}
                       className="text-[10px] uppercase tracking-widest text-blue-500 hover:text-blue-300"
@@ -128,7 +150,9 @@ export const ClientEvents: React.FC<ClientEventsProps> = ({ role }) => {
 
         {canCreate && (
           <section className="border border-[#27272a] rounded-3xl p-6 bg-[#0f0f12] space-y-6">
-            <h3 className="text-lg font-black uppercase tracking-widest">Create Event</h3>
+            <h3 className="text-lg font-black uppercase tracking-widest">
+              Create Event
+            </h3>
             <form onSubmit={handleCreate} className="grid gap-4">
               <input
                 className="bg-[#18181b] border border-[#27272a] rounded-xl px-4 py-3 text-sm"
@@ -167,9 +191,20 @@ export const ClientEvents: React.FC<ClientEventsProps> = ({ role }) => {
                 onChange={(e) => setCapacity(e.target.value)}
                 required
               />
+              <input
+                className="bg-[#18181b] border border-[#27272a] rounded-xl px-4 py-3 text-sm"
+                type="number"
+                min={0}
+                step="0.01"
+                placeholder="Price (₹) - Leave 0 for free"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+              />
 
               <div className="space-y-3">
-                <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">Assign Staff</p>
+                <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">
+                  Assign Staff
+                </p>
                 {staffEntries.map((entry, index) => (
                   <div key={index} className="grid grid-cols-2 gap-2">
                     <input
@@ -196,7 +231,12 @@ export const ClientEvents: React.FC<ClientEventsProps> = ({ role }) => {
                 ))}
                 <button
                   type="button"
-                  onClick={() => setStaffEntries([...staffEntries, { email: '', password: '' }])}
+                  onClick={() =>
+                    setStaffEntries([
+                      ...staffEntries,
+                      { email: "", password: "" },
+                    ])
+                  }
                   className="text-xs uppercase tracking-widest text-blue-500"
                 >
                   + Add Staff
@@ -204,7 +244,9 @@ export const ClientEvents: React.FC<ClientEventsProps> = ({ role }) => {
               </div>
 
               {error && (
-                <p className="text-[10px] text-red-500 uppercase tracking-widest font-bold">{error}</p>
+                <p className="text-[10px] text-red-500 uppercase tracking-widest font-bold">
+                  {error}
+                </p>
               )}
               <button className="bg-white text-black font-black uppercase tracking-widest py-3 rounded-xl">
                 Create Event
