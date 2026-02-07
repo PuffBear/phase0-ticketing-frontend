@@ -234,6 +234,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
     setSelectedTierId("default");
     setIsLoading(true);
     setView("checkout");
+    setCheckoutError(null);
 
     try {
       const { bookingId, razorpayOrderId, razorpayKeyId, amount, currency } =
@@ -294,12 +295,19 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
       // PRODUCTION MODE: Use Razorpay
       const Razorpay = (
         window as unknown as {
-          Razorpay: { new (o: Record<string, unknown>): { open: () => void } };
+          Razorpay: {
+            new (o: Record<string, unknown>): {
+              open: () => void;
+              on: (event: string, handler: () => void) => void;
+            };
+          };
         }
       ).Razorpay;
       if (!Razorpay) {
         throw new Error("Razorpay not loaded");
       }
+
+      let paymentHandled = false;
 
       const rzp = new Razorpay({
         key: razorpayKeyId,
@@ -308,43 +316,97 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
         order_id: razorpayOrderId,
         name: "phase0",
         description: selectedEvent.title,
-        handler: async () => {
-          let attempts = 0;
-          const maxAttempts = 30;
-          while (attempts < maxAttempts) {
-            const { status, ticketId } = await pollBookingStatus(bookingId);
-            if (status === "CONFIRMED") {
-              setTickets((prev) => [
-                ...prev,
-                {
-                  id: ticketId || bookingId,
-                  event_id: selectedEvent.id,
-                  tier_id: "default",
-                  owner_user_id: CURRENT_USER.id,
-                  status: TicketStatus.VALID,
-                  checkin_count: 0,
-                  created_at: new Date().toISOString(),
-                },
-              ]);
-              setView("success");
-              return;
+        handler: async (response: {
+          razorpay_payment_id: string;
+          razorpay_order_id: string;
+          razorpay_signature: string;
+        }) => {
+          paymentHandled = true;
+          try {
+            // Verify payment signature on backend
+            await apiPost("/verify-payment", {
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature,
+              bookingId,
+            });
+
+            // Poll for confirmation
+            let attempts = 0;
+            const maxAttempts = 30;
+            while (attempts < maxAttempts) {
+              const { status, ticketId } = await pollBookingStatus(bookingId);
+              if (status === "CONFIRMED") {
+                setTickets((prev) => [
+                  ...prev,
+                  {
+                    id: ticketId || bookingId,
+                    event_id: selectedEvent.id,
+                    tier_id: "default",
+                    owner_user_id: CURRENT_USER.id,
+                    status: TicketStatus.VALID,
+                    checkin_count: 0,
+                    created_at: new Date().toISOString(),
+                  },
+                ]);
+                setView("success");
+                setIsLoading(false);
+                return;
+              }
+              if (status === "CANCELLED") {
+                setView("detail");
+                setCheckoutError("Payment was cancelled.");
+                setIsLoading(false);
+                return;
+              }
+              await new Promise((r) => setTimeout(r, 2000));
+              attempts++;
             }
-            if (status === "CANCELLED") {
-              setView("detail");
-              setCheckoutError("Payment was cancelled.");
-              return;
-            }
-            await new Promise((r) => setTimeout(r, 2000));
-            attempts++;
+            setView("detail");
+            setCheckoutError(
+              "Payment is being processed. Check your wallet shortly.",
+            );
+            setIsLoading(false);
+          } catch (error) {
+            setView("detail");
+            setCheckoutError(
+              error instanceof Error
+                ? error.message
+                : "Payment verification failed. Please contact support.",
+            );
+            setIsLoading(false);
           }
-          setView("detail");
-          setCheckoutError(
-            "Payment is being processed. Check your wallet shortly.",
-          );
+        },
+        modal: {
+          ondismiss: async () => {
+            // Only handle dismissal if payment wasn't already processed
+            if (paymentHandled) {
+              return;
+            }
+
+            // User closed the payment modal without completing payment
+            try {
+              await apiPost("/bookings/" + bookingId + "/cancel", {});
+            } catch (error) {
+              console.error("Failed to cancel booking:", error);
+            }
+            setView("detail");
+            setCheckoutError("Payment was cancelled.");
+            setIsLoading(false);
+          },
         },
       });
 
-      rzp.on("payment.failed", () => {
+      rzp.on("payment.failed", async () => {
+        paymentHandled = true;
+
+        // Mark booking as failed
+        try {
+          await apiPost("/bookings/" + bookingId + "/fail", {});
+        } catch (error) {
+          console.error("Failed to mark booking as failed:", error);
+        }
+
         setView("detail");
         setCheckoutError("Payment failed. Please try again.");
         setIsLoading(false);
@@ -353,13 +415,13 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
       rzp.open();
     } catch (error) {
       console.error("Failed to secure ticket:", error);
-      setCheckoutError(
+      const errorMessage =
         error instanceof Error
           ? error.message
-          : "Something went wrong. Please try again.",
-      );
+          : "Something went wrong. Please try again.";
+
+      setCheckoutError(errorMessage);
       setView("detail");
-    } finally {
       setIsLoading(false);
     }
   };
@@ -493,16 +555,31 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
                           <p className="text-lg font-black text-white">
                             ₹{selectedEvent.price ?? 0}
                           </p>
-                          <button
-                            onClick={claimTicket}
-                            disabled={
-                              isLoading ||
-                              (selectedEvent.availableTickets ?? 1) <= 0
+                          {(() => {
+                            const hasTicket = myTickets.some(
+                              (t) => t.event_id === selectedEvent.id,
+                            );
+                            const isSoldOut =
+                              (selectedEvent.availableTickets ?? 1) <= 0;
+
+                            if (hasTicket) {
+                              return (
+                                <div className="mt-2 w-full bg-green-500/10 text-green-500 font-black uppercase tracking-[0.2em] py-2.5 px-4 rounded-xl text-xs border border-green-500/20 text-center">
+                                  Already Booked
+                                </div>
+                              );
                             }
-                            className="mt-2 w-full bg-white text-black font-black uppercase tracking-[0.2em] py-2.5 px-4 rounded-xl text-xs hover:bg-zinc-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            {isLoading ? "Processing..." : "Buy Ticket"}
-                          </button>
+
+                            return (
+                              <button
+                                onClick={claimTicket}
+                                disabled={isLoading || isSoldOut}
+                                className="mt-2 w-full bg-white text-black font-black uppercase tracking-[0.2em] py-2.5 px-4 rounded-xl text-xs hover:bg-zinc-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {isLoading ? "Processing..." : "Buy Ticket"}
+                              </button>
+                            );
+                          })()}
                         </div>
                       </div>
                       {checkoutError && (

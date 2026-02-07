@@ -1,4 +1,8 @@
-export const API_BASE = import.meta.env.VITE_API_BASE || "http://54.91.10.203";
+export const API_BASE = import.meta.env.VITE_API_BASE;
+
+if (!API_BASE) {
+  throw new Error("VITE_API_BASE environment variable is required");
+}
 
 const parseJSON = async <T>(response: Response): Promise<T> => {
   const data = await response.json().catch(() => ({}));
@@ -11,7 +15,7 @@ const parseJSON = async <T>(response: Response): Promise<T> => {
 
 export const apiPost = async <T>(
   path: string,
-  payload: Record<string, unknown>
+  payload: Record<string, unknown>,
 ): Promise<T> => {
   const response = await fetch(`${API_BASE}${path}`, {
     method: "POST",
