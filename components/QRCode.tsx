@@ -1,44 +1,57 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import QRCode from 'qrcode';
 
 interface QRCodeProps {
   data: string;
+  size?: number;
+  refreshMs?: number;
 }
 
-export const RotatingQRCode: React.FC<QRCodeProps> = ({ data }) => {
-  const [nonce, setNonce] = useState(0);
+export const RotatingQRCode: React.FC<QRCodeProps> = ({ data, size = 192, refreshMs = 15000 }) => {
   const [progress, setProgress] = useState(100);
+  const [qrSrc, setQrSrc] = useState('');
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setNonce(n => n + 1);
-      setProgress(100);
-    }, 5000);
-
-    const timer = setInterval(() => {
-      setProgress(p => Math.max(0, p - 2));
+    const start = Date.now();
+    const timer = window.setInterval(() => {
+      const elapsed = Date.now() - start;
+      const clampedRefreshMs = Math.max(1000, refreshMs);
+      const next = Math.max(0, 100 - (elapsed / clampedRefreshMs) * 100);
+      setProgress(next);
     }, 100);
-
     return () => {
-      clearInterval(interval);
       clearInterval(timer);
     };
-  }, []);
+  }, [data, refreshMs]);
 
-  // Simplified "QR" visualization for simulation
+  useEffect(() => {
+    let cancelled = false;
+    const build = async () => {
+      try {
+        const url = await QRCode.toDataURL(data, {
+          errorCorrectionLevel: 'M',
+          width: size,
+          margin: 2
+        });
+        if (!cancelled) setQrSrc(url);
+      } catch {
+        if (!cancelled) setQrSrc('');
+      }
+    };
+    build();
+    return () => {
+      cancelled = true;
+    };
+  }, [data, size]);
+
   return (
     <div className="relative p-4 bg-white rounded-xl shadow-inner group">
-      <div className="grid grid-cols-8 gap-1 w-48 h-48 opacity-90 transition-all duration-300">
-        {Array.from({ length: 64 }).map((_, i) => {
-          const isActive = (Math.sin(i * (nonce + 1)) + Math.cos(i * (data.length))) > 0;
-          return (
-            <div 
-              key={i} 
-              className={`w-full h-full rounded-[1px] ${isActive ? 'bg-zinc-950' : 'bg-transparent'}`} 
-            />
-          );
-        })}
-      </div>
+      {qrSrc ? (
+        <img src={qrSrc} width={size} height={size} alt="Ticket QR code" className="rounded-md" />
+      ) : (
+        <div className="w-48 h-48 flex items-center justify-center text-xs text-zinc-500">QR loading...</div>
+      )}
       
       {/* Loading bar for rotation */}
       <div className="absolute bottom-0 left-0 h-1 bg-blue-500 transition-all duration-100 ease-linear" style={{ width: `${progress}%` }} />
