@@ -11,6 +11,7 @@ import { ClientEvent } from './pages/client/ClientEvent';
 import { ClientScanner } from './pages/client/ClientScanner';
 import { ClientAccount } from './pages/client/ClientAccount';
 import { ClientAdmin } from './pages/client/ClientAdmin';
+import { Landing } from './pages/Landing';
 
 const emailPattern = /^[^@\s]+@[^@\s]+\.[^@\s]+$/i;
 const usernamePattern = /^[a-z0-9_]{3,20}$/i;
@@ -229,7 +230,7 @@ const AppRoutes: React.FC = () => {
 
   const authLayout = useMemo(() => ({
     activeTab: 'profile' as const,
-    onTabChange: () => {},
+    onTabChange: () => { },
     isLoggedIn: false
   }), []);
 
@@ -249,7 +250,7 @@ const AppRoutes: React.FC = () => {
 
   return (
     <Routes>
-      <Route path="/" element={<Navigate to={defaultRoute} replace />} />
+      <Route path="/" element={<Landing user={authUser} />} />
       <Route
         path="/auth"
         element={
