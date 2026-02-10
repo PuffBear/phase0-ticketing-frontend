@@ -1,7 +1,7 @@
-
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
+import { CorridorExplorer } from '../components/CorridorExplorer';
 import { Icons } from '../constants';
 import { User, UserRole } from '../types';
 
@@ -9,21 +9,32 @@ interface LandingProps {
     user: User | null;
 }
 
+type LandingView = 'hero' | 'corridor';
+
 export const Landing: React.FC<LandingProps> = ({ user }) => {
     const navigate = useNavigate();
+    const [view, setView] = useState<LandingView>('hero');
 
     const handleEnter = () => {
         if (user) {
+            // If user is logged in, go directly to their dashboard
             if (user.role === UserRole.STAFF || user.role === UserRole.HOST || user.role === UserRole.ADMIN) {
                 navigate('/client/events');
             } else {
                 navigate('/app');
             }
         } else {
-            navigate('/auth');
+            // If not logged in, show the corridor explorer
+            setView('corridor');
         }
     };
 
+    // Corridor view - fullscreen experience
+    if (view === 'corridor') {
+        return <CorridorExplorer />;
+    }
+
+    // Hero view - original landing page
     return (
         <Layout activeTab="explore" isLoggedIn={!!user} onTabChange={() => { }}>
             <div className="flex flex-col items-center justify-center min-h-[85vh] p-6 text-center space-y-16 animate-in fade-in duration-700">
