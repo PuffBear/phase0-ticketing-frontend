@@ -77,11 +77,10 @@ const ExploreCard: React.FC<{
             </span>
           </div>
           <span
-            className={`text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-[0.15em] ${
-              isSoldOut
-                ? "bg-red-500/10 text-red-500"
-                : "bg-blue-500/10 text-blue-500"
-            }`}
+            className={`text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-[0.15em] ${isSoldOut
+              ? "bg-red-500/10 text-red-500"
+              : "bg-blue-500/10 text-blue-500"
+              }`}
           >
             {isSoldOut ? "Max Capacity" : "Secure Entry Active"}
           </span>
@@ -131,9 +130,8 @@ const ExploreCard: React.FC<{
       <div className="h-2 w-full bg-[#111114] flex items-center px-1 border-t border-[#27272a]">
         <div className="h-1 bg-zinc-800 w-full rounded-full overflow-hidden">
           <div
-            className={`h-full ${
-              isSoldOut ? "bg-red-500" : "bg-blue-600"
-            } shadow-[0_0_8px_rgba(37,99,235,0.4)] transition-all duration-1000 ease-out rounded-full`}
+            className={`h-full ${isSoldOut ? "bg-red-500" : "bg-blue-600"
+              } shadow-[0_0_8px_rgba(37,99,235,0.4)] transition-all duration-1000 ease-out rounded-full`}
             style={{ width: `${Math.min(100, progress)}%` }}
           ></div>
         </div>
@@ -228,6 +226,15 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
     return result;
   };
 
+  const refreshEvents = async () => {
+    try {
+      const result = await apiGet<{ events: ExploreEvent[] }>("/events");
+      setEvents(result.events || []);
+    } catch (error) {
+      console.error("Failed to refresh events:", error);
+    }
+  };
+
   const claimTicket = async () => {
     if (!selectedEvent) return;
 
@@ -271,6 +278,10 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
                 created_at: new Date().toISOString(),
               },
             ]);
+            await refreshEvents();
+            const updatedDev = await apiGet<{ events: ExploreEvent[] }>("/events");
+            const freshEventDev = updatedDev.events.find(e => e.id === selectedEvent.id);
+            if (freshEventDev) setSelectedEvent(freshEventDev);
             setView("success");
             setIsLoading(false);
             return;
@@ -296,7 +307,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
       const Razorpay = (
         window as unknown as {
           Razorpay: {
-            new (o: Record<string, unknown>): {
+            new(o: Record<string, unknown>): {
               open: () => void;
               on: (event: string, handler: () => void) => void;
             };
@@ -349,6 +360,10 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
                     created_at: new Date().toISOString(),
                   },
                 ]);
+                await refreshEvents();
+                const updatedProd = await apiGet<{ events: ExploreEvent[] }>("/events");
+                const freshEventProd = updatedProd.events.find(e => e.id === selectedEvent.id);
+                if (freshEventProd) setSelectedEvent(freshEventProd);
                 setView("success");
                 setIsLoading(false);
                 return;
@@ -545,10 +560,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
                             General Admission
                           </p>
                           <p className="text-xs text-zinc-500 mt-0.5">
-                            {selectedEvent.availableTickets ??
-                              selectedEvent.capacity -
-                                selectedEvent.ticketsSold}{" "}
-                            available
+                            {selectedEvent.availableTickets} available
                           </p>
                         </div>
                         <div className="text-right">
@@ -666,15 +678,15 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
                   };
                   const event = ticketWithEvent._event
                     ? {
-                        title: ticketWithEvent._event.title,
-                        location: ticketWithEvent._event.location,
-                        venue_mode: undefined,
-                      }
+                      title: ticketWithEvent._event.title,
+                      location: ticketWithEvent._event.location,
+                      venue_mode: undefined,
+                    }
                     : (events.find((e) => e.id === ticket.event_id) ?? {
-                        title: "Event",
-                        location: "",
-                        venue_mode: undefined,
-                      });
+                      title: "Event",
+                      location: "",
+                      venue_mode: undefined,
+                    });
                   return (
                     <div
                       key={ticket.id}
@@ -709,7 +721,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
                             </p>
                             <p className="text-xs font-bold text-zinc-200">
                               {event?.venue_mode ===
-                              VenueMode.REVEAL_AFTER_TICKET
+                                VenueMode.REVEAL_AFTER_TICKET
                                 ? event.location
                                 : "Hidden - Resolve at Door"}
                             </p>
@@ -719,11 +731,10 @@ export const Home: React.FC<HomeProps> = ({ user, onLogout }) => {
                               Lifecycle
                             </p>
                             <p
-                              className={`text-xs font-black uppercase ${
-                                ticket.checkin_count > 0
-                                  ? "text-zinc-500"
-                                  : "text-green-500"
-                              }`}
+                              className={`text-xs font-black uppercase ${ticket.checkin_count > 0
+                                ? "text-zinc-500"
+                                : "text-green-500"
+                                }`}
                             >
                               {ticket.checkin_count > 0 ? "EXPIRED" : "ACTIVE"}
                             </p>

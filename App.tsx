@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { Icons } from './constants';
 import { apiGet, apiPost } from './services/api';
@@ -22,6 +22,125 @@ const isClientRole = (role?: UserRole) => {
   return role === UserRole.STAFF || role === UserRole.HOST || role === UserRole.ADMIN;
 };
 
+const ResetPasswordPage: React.FC<{
+  resetPasswordValue: string;
+  resetPasswordConfirm: string;
+  setResetPasswordValue: (v: string) => void;
+  setResetPasswordConfirm: (v: string) => void;
+  isSubmitting: boolean;
+  authError: string | null;
+  setAuthError: (msg: string | null) => void;
+}> = ({
+  resetPasswordValue,
+  resetPasswordConfirm,
+  setResetPasswordValue,
+  setResetPasswordConfirm,
+  isSubmitting,
+  authError,
+  setAuthError,
+}) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const search = new URLSearchParams(location.search);
+  const token = search.get('token') || '';
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setAuthError(null);
+
+    if (!token) {
+      setAuthError('Invalid or missing token.');
+      return;
+    }
+
+    if (resetPasswordValue.length < 8) {
+      setAuthError('Password must be at least 8 characters.');
+      return;
+    }
+
+    if (resetPasswordValue !== resetPasswordConfirm) {
+      setAuthError('Passwords do not match.');
+      return;
+    }
+
+    try {
+      await apiPost('/auth/reset-password', {
+        token,
+        password: resetPasswordValue,
+      });
+      navigate('/login');
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Something went wrong.');
+    }
+  };
+
+  return (
+    <div className="min-h-[80vh] flex flex-col justify-center p-6 space-y-12 max-w-sm mx-auto">
+      <div className="space-y-4">
+        <div className="text-blue-500 scale-[2] origin-left mb-2">
+          <Icons.Symbol />
+        </div>
+        <div className="space-y-1">
+          <h1 className="text-3xl font-black tracking-tighter leading-none uppercase">Set new password</h1>
+          <p className="text-zinc-500 font-bold uppercase text-[10px] tracking-[0.2em]">Secure account recovery</p>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-2">
+          <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest ml-1">
+            New Password
+          </label>
+          <input
+            type="password"
+            value={resetPasswordValue}
+            onChange={(e) => setResetPasswordValue(e.target.value)}
+            placeholder="Minimum 8 characters"
+            className="w-full bg-[#18181b] border border-[#27272a] rounded-xl px-4 py-4 font-mono text-sm focus:border-blue-500 outline-none transition-all"
+            required
+            disabled={isSubmitting}
+          />
+        </div>
+        <div className="space-y-2">
+          <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest ml-1">
+            Confirm Password
+          </label>
+          <input
+            type="password"
+            value={resetPasswordConfirm}
+            onChange={(e) => setResetPasswordConfirm(e.target.value)}
+            placeholder="Repeat password"
+            className="w-full bg-[#18181b] border border-[#27272a] rounded-xl px-4 py-4 font-mono text-sm focus:border-blue-500 outline-none transition-all"
+            required
+            disabled={isSubmitting}
+          />
+        </div>
+
+        {authError && (
+          <p className="text-[10px] text-red-500 uppercase tracking-widest font-bold">{authError}</p>
+        )}
+
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="w-full bg-white text-black py-4 rounded-xl font-black uppercase tracking-[0.2em] shadow-xl hover:bg-zinc-200 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+        >
+          {isSubmitting ? '...' : 'Update Password'}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigate('/login')}
+          className="w-full text-center text-[10px] text-zinc-500 hover:text-white transition-colors uppercase tracking-widest font-bold mt-2"
+        >
+          Back to login
+        </button>
+      </form>
+    </div>
+  );
+};
+
 const AppRoutes: React.FC = () => {
   const navigate = useNavigate();
   const [authUser, setAuthUser] = useState<User | null>(null);
@@ -40,6 +159,9 @@ const AppRoutes: React.FC = () => {
   const [clientEmail, setClientEmail] = useState('');
   const [clientPassword, setClientPassword] = useState('');
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [resetPasswordValue, setResetPasswordValue] = useState('');
+  const [resetPasswordConfirm, setResetPasswordConfirm] = useState('');
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -502,6 +624,24 @@ const AppRoutes: React.FC = () => {
                       required
                       disabled={isSubmitting}
                     />
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => navigate('/forgot-password')}
+                        className="text-[10px] text-zinc-500 hover:text-white transition-colors uppercase tracking-widest"
+                      >
+                        Forgot password?
+                      </button>
+                    </div>
+                    <div className="flex justify-center pt-2">
+                      <button
+                        type="button"
+                        onClick={() => navigate('/auth')}
+                        className="text-[10px] text-zinc-500 hover:text-white transition-colors uppercase tracking-widest font-bold"
+                      >
+                        New user? Sign up
+                      </button>
+                    </div>
                   </div>
 
                   {authError && (
@@ -520,6 +660,104 @@ const AppRoutes: React.FC = () => {
                   Infrastructure for high-trust environments.
                 </p>
               </div>
+            </Layout>
+          )
+        }
+      />
+      <Route
+        path="/forgot-password"
+        element={
+          authUser ? (
+            <Navigate to={defaultRoute} replace />
+          ) : (
+            <Layout {...authLayout}>
+              <div className="min-h-[80vh] flex flex-col justify-center p-6 space-y-12 max-w-sm mx-auto">
+                <div className="space-y-4">
+                  <div className="text-blue-500 scale-[2] origin-left mb-2">
+                    <Icons.Symbol />
+                  </div>
+                  <div className="space-y-1">
+                    <h1 className="text-3xl font-black tracking-tighter leading-none uppercase">Reset password</h1>
+                    <p className="text-zinc-500 font-bold uppercase text-[10px] tracking-[0.2em]">Request reset link</p>
+                  </div>
+                </div>
+
+                <form
+                  onSubmit={async (event) => {
+                    event.preventDefault();
+                    resetAuthErrors();
+
+                    if (!isValidEmail(forgotEmail)) {
+                      setAuthError('Use a valid email address.');
+                      return;
+                    }
+
+                    setIsSubmitting(true);
+                    try {
+                      await apiPost('/auth/forgot-password', { email: forgotEmail });
+                      setAuthError('If an account exists, a reset link has been sent.');
+                    } catch (error) {
+                      setAuthError(error instanceof Error ? error.message : 'Something went wrong.');
+                    } finally {
+                      setIsSubmitting(false);
+                    }
+                  }}
+                  className="space-y-4"
+                >
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-zinc-500 tracking-widest ml-1">Email</label>
+                    <input
+                      type="email"
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                      placeholder="name@example.com"
+                      className="w-full bg-[#18181b] border border-[#27272a] rounded-xl px-4 py-4 font-mono text-sm focus:border-blue-500 outline-none transition-all"
+                      required
+                      disabled={isSubmitting}
+                    />
+                  </div>
+
+                  {authError && (
+                    <p className="text-[10px] text-red-500 uppercase tracking-widest font-bold">{authError}</p>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full bg-white text-black py-4 rounded-xl font-black uppercase tracking-[0.2em] shadow-xl hover:bg-zinc-200 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                  >
+                    {isSubmitting ? '...' : 'Send reset link'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => navigate('/login')}
+                    className="w-full text-center text-[10px] text-zinc-500 hover:text-white transition-colors uppercase tracking-widest font-bold mt-2"
+                  >
+                    Back to login
+                  </button>
+                </form>
+              </div>
+            </Layout>
+          )
+        }
+      />
+      <Route
+        path="/reset-password"
+        element={
+          authUser ? (
+            <Navigate to={defaultRoute} replace />
+          ) : (
+            <Layout {...authLayout}>
+              <ResetPasswordPage
+                resetPasswordValue={resetPasswordValue}
+                resetPasswordConfirm={resetPasswordConfirm}
+                setResetPasswordValue={setResetPasswordValue}
+                setResetPasswordConfirm={setResetPasswordConfirm}
+                isSubmitting={isSubmitting}
+                authError={authError}
+                setAuthError={setAuthError}
+              />
             </Layout>
           )
         }
