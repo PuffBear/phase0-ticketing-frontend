@@ -199,8 +199,10 @@ const AppRoutes: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      const result = await apiPost<{ next: 'login' | 'verify'; role?: string }>('/auth/start', { email });
-      if (result.next === 'login') {
+      const result = await apiPost<{ next: 'login' | 'verify' | 'google_only'; role?: string }>('/auth/start', { email });
+      if (result.next === 'google_only') {
+        setAuthError('This account uses Google sign-in. Please use "Continue with Google" below.');
+      } else if (result.next === 'login') {
         if (result.role && result.role !== 'USER') {
           setClientEmail(email);
           navigate('/client/login');
