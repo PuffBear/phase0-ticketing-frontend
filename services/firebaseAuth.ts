@@ -25,17 +25,33 @@ import type { User } from '../types';
  * @returns The app User object from our backend
  * @throws Error with a user-friendly message on failure
  */
+/** How long (ms) to wait for the Google popup before giving up. */
+const GOOGLE_POPUP_TIMEOUT_MS = 90_000;
+
 export async function signInWithGoogle(): Promise<User> {
     let firebaseUser: FirebaseUser;
 
+    // Race the popup against a timeout so that if the user walks away
+    // (closes the browser, switches tabs, never clicks anything) it doesn't
+    // hang the UI in "Signing in..." for eternity.
+    const popupPromise = signInWithPopup(auth, googleProvider);
+    const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(
+            () => reject({ code: 'auth/timeout' }),
+            GOOGLE_POPUP_TIMEOUT_MS
+        )
+    );
+
     try {
-        const result = await signInWithPopup(auth, googleProvider);
+        const result = await Promise.race([popupPromise, timeoutPromise]);
         firebaseUser = result.user;
     } catch (error: unknown) {
-        // Handle user-cancelled popup gracefully
         const code = (error as { code?: string })?.code;
         if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
             throw new Error('Sign-in cancelled.');
+        }
+        if (code === 'auth/timeout') {
+            throw new Error('Sign-in timed out. Please try again.');
         }
         if (code === 'auth/popup-blocked') {
             throw new Error('Popup was blocked. Please allow popups for this site.');

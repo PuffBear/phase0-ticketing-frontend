@@ -147,7 +147,10 @@ const AppRoutes: React.FC = () => {
   const [authUser, setAuthUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  // Separate loading states so the Google button and local form never bleed into each other
+  const [isFormSubmitting, setIsFormSubmitting] = useState(false);
+  const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
+  const isSubmitting = isFormSubmitting || isGoogleSubmitting; // convenience for disabling inputs
 
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
@@ -197,7 +200,7 @@ const AppRoutes: React.FC = () => {
       return;
     }
 
-    setIsSubmitting(true);
+    setIsFormSubmitting(true);
     try {
       const result = await apiPost<{ next: 'login' | 'verify' | 'google_only'; role?: string }>('/auth/start', { email });
       if (result.next === 'google_only') {
@@ -218,7 +221,7 @@ const AppRoutes: React.FC = () => {
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : 'Something went wrong.');
     } finally {
-      setIsSubmitting(false);
+      setIsFormSubmitting(false);
     }
   };
 
@@ -231,7 +234,7 @@ const AppRoutes: React.FC = () => {
       return;
     }
 
-    setIsSubmitting(true);
+    setIsFormSubmitting(true);
     try {
       const result = await apiPost<{ token: string; next: 'signup' }>('/auth/verify-otp', { email, code: otp });
       setVerificationToken(result.token);
@@ -239,13 +242,13 @@ const AppRoutes: React.FC = () => {
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : 'Something went wrong.');
     } finally {
-      setIsSubmitting(false);
+      setIsFormSubmitting(false);
     }
   };
 
   const handleResend = async () => {
     resetAuthErrors();
-    setIsSubmitting(true);
+    setIsFormSubmitting(true);
     try {
       await apiPost('/auth/send-otp', { email });
       setOtp('');
@@ -253,7 +256,7 @@ const AppRoutes: React.FC = () => {
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : 'Something went wrong.');
     } finally {
-      setIsSubmitting(false);
+      setIsFormSubmitting(false);
     }
   };
 
@@ -276,7 +279,7 @@ const AppRoutes: React.FC = () => {
       return;
     }
 
-    setIsSubmitting(true);
+    setIsFormSubmitting(true);
     try {
       const result = await apiPost<{ ok: true; user: User }>('/auth/signup', {
         name: fullName,
@@ -290,7 +293,7 @@ const AppRoutes: React.FC = () => {
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : 'Something went wrong.');
     } finally {
-      setIsSubmitting(false);
+      setIsFormSubmitting(false);
     }
   };
 
@@ -303,7 +306,7 @@ const AppRoutes: React.FC = () => {
       return;
     }
 
-    setIsSubmitting(true);
+    setIsFormSubmitting(true);
     try {
       const result = await apiPost<{ ok: true; user: User }>('/auth/login', {
         email: loginEmail,
@@ -314,7 +317,7 @@ const AppRoutes: React.FC = () => {
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : 'Something went wrong.');
     } finally {
-      setIsSubmitting(false);
+      setIsFormSubmitting(false);
     }
   };
 
@@ -327,7 +330,7 @@ const AppRoutes: React.FC = () => {
       return;
     }
 
-    setIsSubmitting(true);
+    setIsFormSubmitting(true);
     try {
       const result = await apiPost<{ ok: true; user: User }>('/auth/login', {
         email: clientEmail,
@@ -338,13 +341,13 @@ const AppRoutes: React.FC = () => {
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : 'Something went wrong.');
     } finally {
-      setIsSubmitting(false);
+      setIsFormSubmitting(false);
     }
   };
 
   const handleGoogleLogin = async () => {
     resetAuthErrors();
-    setIsSubmitting(true);
+    setIsGoogleSubmitting(true);
     try {
       const user = await signInWithGoogle();
       setAuthUser(user);
@@ -356,7 +359,7 @@ const AppRoutes: React.FC = () => {
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : 'Google sign-in failed.');
     } finally {
-      setIsSubmitting(false);
+      setIsGoogleSubmitting(false);
     }
   };
 
@@ -430,10 +433,10 @@ const AppRoutes: React.FC = () => {
 
                 <button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={isFormSubmitting || isGoogleSubmitting}
                   className="w-full bg-white text-black py-4 rounded-xl font-black uppercase tracking-[0.2em] shadow-xl hover:bg-zinc-200 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
                 >
-                  {isSubmitting ? '...' : 'Continue'}
+                  {isFormSubmitting ? '...' : 'Continue'}
                 </button>
               </form>
 
@@ -448,7 +451,7 @@ const AppRoutes: React.FC = () => {
               <button
                 type="button"
                 onClick={handleGoogleLogin}
-                disabled={isSubmitting}
+                disabled={isGoogleSubmitting || isFormSubmitting}
                 className="w-full bg-[#18181b] border border-[#27272a] text-white py-4 rounded-xl font-black uppercase tracking-[0.15em] hover:bg-zinc-800 hover:border-zinc-600 transition-all active:scale-[0.98] flex items-center justify-center gap-3 disabled:opacity-50"
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -457,7 +460,7 @@ const AppRoutes: React.FC = () => {
                   <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05" />
                   <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
                 </svg>
-                {isSubmitting ? 'Signing in...' : 'Continue with Google'}
+                {isGoogleSubmitting ? 'Signing in...' : 'Continue with Google'}
               </button>
 
               <p className="text-[10px] text-zinc-700 text-center font-bold uppercase tracking-widest">
@@ -696,10 +699,10 @@ const AppRoutes: React.FC = () => {
 
                   <button
                     type="submit"
-                    disabled={isSubmitting}
+                    disabled={isFormSubmitting || isGoogleSubmitting}
                     className="w-full bg-white text-black py-4 rounded-xl font-black uppercase tracking-[0.2em] shadow-xl hover:bg-zinc-200 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
                   >
-                    {isSubmitting ? '...' : 'Login'}
+                    {isFormSubmitting ? '...' : 'Login'}
                   </button>
                 </form>
 
@@ -714,7 +717,7 @@ const AppRoutes: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleGoogleLogin}
-                  disabled={isSubmitting}
+                  disabled={isGoogleSubmitting || isFormSubmitting}
                   className="w-full bg-[#18181b] border border-[#27272a] text-white py-4 rounded-xl font-black uppercase tracking-[0.15em] hover:bg-zinc-800 hover:border-zinc-600 transition-all active:scale-[0.98] flex items-center justify-center gap-3 disabled:opacity-50"
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -723,7 +726,7 @@ const AppRoutes: React.FC = () => {
                     <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05" />
                     <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
                   </svg>
-                  {isSubmitting ? 'Signing in...' : 'Continue with Google'}
+                  {isGoogleSubmitting ? 'Signing in...' : 'Continue with Google'}
                 </button>
 
                 <p className="text-[10px] text-zinc-700 text-center font-bold uppercase tracking-widest">
@@ -762,14 +765,14 @@ const AppRoutes: React.FC = () => {
                       return;
                     }
 
-                    setIsSubmitting(true);
+                    setIsFormSubmitting(true);
                     try {
                       await apiPost('/auth/forgot-password', { email: forgotEmail });
                       setAuthError('If an account exists, a reset link has been sent.');
                     } catch (error) {
                       setAuthError(error instanceof Error ? error.message : 'Something went wrong.');
                     } finally {
-                      setIsSubmitting(false);
+                      setIsFormSubmitting(false);
                     }
                   }}
                   className="space-y-4"
@@ -796,7 +799,7 @@ const AppRoutes: React.FC = () => {
                     disabled={isSubmitting}
                     className="w-full bg-white text-black py-4 rounded-xl font-black uppercase tracking-[0.2em] shadow-xl hover:bg-zinc-200 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
                   >
-                    {isSubmitting ? '...' : 'Send reset link'}
+                    {isFormSubmitting ? '...' : 'Send reset link'}
                   </button>
 
                   <button
